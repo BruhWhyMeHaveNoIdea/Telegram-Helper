@@ -3,8 +3,7 @@ import os
 
 from dotenv import load_dotenv
 
-load_dotenv(dotenv_path=r"C:\Users\user\PycharmProjects\tg_univ_bot\config.env")
-
+load_dotenv(os.path.abspath("config.env"))
 gpt_config = {
     'model': os.environ.get("OPENAI_MODEL"),
     'api_key': os.environ.get('OPENAI_API_KEY'),
