@@ -3,7 +3,14 @@ import os
 
 from dotenv import load_dotenv
 
-load_dotenv(os.path.abspath("config.env"))
+path = os.path.abspath(__file__)
+parts = path.split(os.sep)
+
+index = parts.index('tg_univ_bot')
+tg_univ_bot_path = os.sep.join(parts[:index + 1])
+load_dotenv(dotenv_path=tg_univ_bot_path+'config.env')
+
+
 gpt_config = {
     'model': os.environ.get("OPENAI_MODEL"),
     'api_key': os.environ.get('OPENAI_API_KEY'),
