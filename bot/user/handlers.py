@@ -184,9 +184,12 @@ class Questioning(StatesGroup):
 @router.callback_query(F.data == "your_marketer")
 async def your_marketer_handler(callback: CallbackQuery, state: FSMContext):
     if HistoryFuncs.user_in_database(callback.from_user.id):
-        await callback.message.edit_text(text="Вы уже отвечали на вопросы, желаете пропустить их?", reply_markup=keyboards.marketer_question_keyboards)
+        print(1)
+        await callback.message.delete()
+        await callback.message.answer(text="Вы уже отвечали на вопросы, желаете пропустить их?", reply_markup=keyboards.marketer_question_keyboards)
     else:
-        await callback.message.edit_text(text=texts.message1_1)
+        await callback.message.delete()
+        await callback.message.answer(text=texts.message1_1)
         await state.set_state(Questioning.First_question)
 
 @router.callback_query(F.data == "complete_questions")
