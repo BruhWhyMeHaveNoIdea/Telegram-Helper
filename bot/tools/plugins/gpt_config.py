@@ -6,7 +6,7 @@ from dotenv import load_dotenv
 path = os.path.abspath(__file__)
 parts = path.split(os.sep)
 
-index = parts.index('tg_univ_bot')
+index = parts.index('Telegram-Helper')
 tg_univ_bot_path = os.sep.join(parts[:index + 1])
 load_dotenv(dotenv_path=tg_univ_bot_path+'config.env')
 
