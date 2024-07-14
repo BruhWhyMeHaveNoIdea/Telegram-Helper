@@ -63,6 +63,8 @@ gpt_config = {
     'db_connection_url': os.environ.get('DB_CONNECTION_URL')
 }
 
+print(gpt_config['api_key'])
+
 plugin_config = {
         'plugins': os.environ.get('plugins', '').split(',')
     }
