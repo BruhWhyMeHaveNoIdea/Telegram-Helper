@@ -3,7 +3,16 @@ import os
 
 from dotenv import load_dotenv
 
-load_dotenv(os.path.abspath("config.env"))
+path = os.path.abspath(__file__)
+# Получаем части пути
+parts = path.split(os.sep)
+
+
+index = parts.index('Telegram-Helper')
+# Собираем путь до этой директории
+tg_univ_bot_path = os.sep.join(parts[:index + 1])
+load_dotenv(dotenv_path=(tg_univ_bot_path+os.sep+'config.env'))
+
 gpt_config = {
     'model': os.environ.get("OPENAI_MODEL"),
     'api_key': os.environ.get('OPENAI_API_KEY'),
@@ -55,6 +64,9 @@ gpt_config = {
     'vision_model': os.environ.get('VISION_MODEL'),
     'db_connection_url': os.environ.get('DB_CONNECTION_URL')
 }
+
+print(os.environ.get('OPENAI_API_KEY'))
+print(os.environ.get('MAX_TOKENS'))
 
 plugin_config = {
         'plugins': os.environ.get('plugins', '').split(',')
