@@ -9,6 +9,7 @@ parts = path.split(os.sep)
 index = parts.index('Telegram-Helper')
 tg_univ_bot_path = os.sep.join(parts[:index + 1])
 load_dotenv(dotenv_path=(tg_univ_bot_path+r'\config.env'))
+print('fdfdfdffd', tg_univ_bot_path+r'\config.env')
 
 
 gpt_config = {
