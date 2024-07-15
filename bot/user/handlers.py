@@ -38,12 +38,10 @@ async def start_handler(message: Message):
         logging.info("Пользователь уже в БД")
         current_time = datetime.datetime.now()
         joined_time, joined_date = NewUsersFuncs.get_user_join_time(user_id)[1].split('.')[0].split(':'), NewUsersFuncs.get_user_join_time(user_id)[0].split('-')
-        print('ffff', joined_time, joined_date)
         joined_time_and_date = datetime.datetime(year=int(joined_date[0]), month=int(joined_date[1]),\
                                                  day=int(joined_date[2]), hour=int(joined_time[0]),\
                                                  minute=int(joined_time[1]), second=int(joined_time[2]))
         dif_time = (current_time-joined_time_and_date).total_seconds()
-        print(dif_time)
         if dif_time > 86400:
             await message.answer(text="Пробное время закончилось. Вы можете приобрести подписку, чтобы продолжить пользование ботом.")
             return

@@ -13,7 +13,7 @@ async def ask_gpt(question):
         {'role': 'user', 'content': question}
         ]
 
-    response = openai.chat.completions.create(
+    response = openai.ChatCompletion.create(
         model=gpt_config['model']
         , messages=message
         , temperature=gpt_config['temperature']
