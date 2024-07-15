@@ -10,7 +10,7 @@ from sqlalchemy.orm import sessionmaker
 
 
 
-from bot.tools.another_way import ask_question
+from bot.tools.another_way import ask_gpt
 from bot.tools.plugins.gpt_config import gpt_config
 from bot.tools.plugin_manager import PluginManager
 from bot.database.database import engine
@@ -244,20 +244,20 @@ async def third_block(callback: CallbackQuery):
     business_info, company_info, audience_info = HistoryFuncs.get_history(user_id)
     names_and_descriptions_prompt = f"Придумай название и описание для телеграм канала проекта со следующим описанием проекта - {business_info}. Учти также описание его аудитории - {audience_info}. И воспользуйся информацией о продуктах - {company_info}. Описание должно быть не более 255 символов, а название должно содержать от 2 до 4 слов. Предложи 10 идей названий, каждое название пиши на новой строке. Не давай каких-либо комментариев. Пиши на русском языке"
     marketing_strategy_plan_prompt = f"Ты маркетолог в телеграм, твои формулировки точны, просты, понятны любым клиентам :: Составь концепцию для маркетинга, который поможет грамотно вести телеграм канал со следующим описанием проекта - {business_info}. Учти также описание его аудитории - {audience_info}. И воспользуйся информацией о продуктах - {company_info}. :: Результат должен включать в себя развернутые 4 пункта :: 1 - описание каждого Продукта из списка предоставленной информацией о продуктах. Включать, что мы продаем, для кого мы это делаем и как мы это делаем. 2 - описание конкурентных преимуществ. Почему именно мы, чем мы лучше других, почему стоит выбрать именно нас. 3 - детальное описание целевой аудитории на базе предоствленных данных о целевой аудитории. Должно содержать - Кто наш клиент, чего он хочет, какие у него есть потребности и желания. 4 - Позиционирование. Кто мы, что мы делаем и для кого :: Выведи ответ без вводных фраз с подробным описанием на все пункты. Пиши на русском языке"
-    marketing_strategy_plan_response, marketing_strategy_plan_tokens = await ask_question(marketing_strategy_plan_prompt)
+    marketing_strategy_plan_response, marketing_strategy_plan_tokens = await ask_gpt(marketing_strategy_plan_prompt)
     # done лид магнит должен включать генерацию marketing_strategy_plan_prompt
     lead_magnet_prompt = f"Придумай 5 идей лид-магнитов для телеграм канала и бизнеса в целом. Распиши подробно каждый лид-магнит в 15 тезисов. Учти описание проекта - {business_info}. Учти также описание его аудитории - {audience_info}. И воспользуйся информацией о продуктах - {company_info}. Также вопсользуйся следующей информацией про маркетинг проекта - {marketing_strategy_plan_response}. Пиши на русском языке. Не давай каких-либо комментариев."
-    lead_magnet_response, lead_magnet_tokens = await ask_question(lead_magnet_prompt)
+    lead_magnet_response, lead_magnet_tokens = await ask_gpt(lead_magnet_prompt)
     # done контент план должен содержать генерации marketing_strategy_plan_prompt и lead_magnet_prompt
     content_plan_prompt = f'Создай контент план для телеграм канала на 7 дней, по 2 поста в день. Посты должны быть разные: продающие, вовлекающие, информационные, познавательные, опросы, отзывы, рассказ о продуктах эксперта. В посте указывать, какой это пост, как в примере ""Вечерний пост (Познавательный)"" :: Учти описание проекта - {business_info}. Учти также описание его аудитории - {audience_info}. И воспользуйся информацией о продуктах - {company_info}. Также воспользуйся следующей информацией про маркетинг проекта - {marketing_strategy_plan_response}:: также учти наличие следующих лиц-магнитов - {lead_magnet_response}. Пиши на русском языке. Не давай каких-либо комментариев.'
     # done контент план для сторис должен содержать генерации marketing_strategy_plan_prompt и lead_magnet_prompt
     stories_content_prompt = f"Создай контент план сторис для телеграм канала на 7 дней, который должен включать 21 сторис. Сторис должны быть разные: продающие, вовлекающие, информационные, познавательные, опросы, отзывы, рассказ о продуктах эксперта. :: Учти описание проекта - {business_info}. Учти также описание его аудитории - {audience_info}. И воспользуйся информацией о продуктах - {company_info}. Также воспользуйся следующей информацией про маркетинг проекта - {marketing_strategy_plan_response} :: также учти наличие следующих лиц-магнитов - {lead_magnet_response}. Пиши на русском языке. Не давай каких-либо комментариев."
     # ради интереса, проверить сохраняет ли гпт контекст | в любом случае выполнять генерацию промпта последним
     pinned_post_prompt = f"Учитывая информацию о проекте, продуктах и контент план, напиши пост, который автор закрепит в телеграм. Пост должен вызвать интерес у людей, побудить записаться на консультацию, также укажи информацию о канале и авторе, о продуктах. Пост должен быть от 1500 до 2000 символов. Пиши на русском языке"
-    names_and_descriptions_response, names_and_descriptions_total_tokens = await ask_question(names_and_descriptions_prompt)
-    pinned_post_response, pinned_post_tokens = await ask_question(pinned_post_prompt)
-    content_plan_response, content_plan_tokens = await ask_question(content_plan_prompt)
-    stories_content_response, stories_content_tokens = await ask_question(stories_content_prompt)
+    names_and_descriptions_response, names_and_descriptions_total_tokens = await ask_gpt(names_and_descriptions_prompt)
+    pinned_post_response, pinned_post_tokens = await ask_gpt(pinned_post_prompt)
+    content_plan_response, content_plan_tokens = await ask_gpt(content_plan_prompt)
+    stories_content_response, stories_content_tokens = await ask_gpt(stories_content_prompt)
 
 
     query = HistoryModel(
@@ -352,7 +352,7 @@ async def mark_results(callback: CallbackQuery):
     await callback.answer()
     business_info, company_info, audience_info = HistoryFuncs.get_history(user_id)
     marketing_strategy_plan_prompt = f"Ты маркетолог в телеграм, твои формулировки точны, просты, понятны любым клиентам :: Составь концепцию для маркетинга, который поможет грамотно вести телеграм канал со следующим описанием проекта - {business_info}. Учти также описание его аудитории - {audience_info}. И воспользуйся информацией о продуктах - {company_info}. :: Результат должен включать в себя развернутые 4 пункта :: 1 - описание каждого Продукта из списка предоставленной информацией о продуктах. Включать, что мы продаем, для кого мы это делаем и как мы это делаем. 2 - описание конкурентных преимуществ. Почему именно мы, чем мы лучше других, почему стоит выбрать именно нас. 3 - детальное описание целевой аудитории на базе предоствленных данных о целевой аудитории. Должно содержать - Кто наш клиент, чего он хочет, какие у него есть потребности и желания. 4 - Позиционирование. Кто мы, что мы делаем и для кого :: Выведи ответ без вводных фраз с подробным описанием на все пункты. Пиши на русском языке"
-    marketing_strategy_plan_response, marketing_strategy_plan_tokens = await ask_question(
+    marketing_strategy_plan_response, marketing_strategy_plan_tokens = await ask_gpt(
         marketing_strategy_plan_prompt)
     HistoryFuncs.change_marketing(user_id, marketing_strategy_plan_response)
     await message.edit_text(text=f"Итак, вот идея маркетинга:\n {marketing_strategy_plan_response}", reply_markup=keyboards.to_fmenu_from_choices_kb)
@@ -434,7 +434,7 @@ async def post_results(callback: CallbackQuery):
     user_id = callback.from_user.id
     business_info, company_info, audience_info = HistoryFuncs.get_history(user_id)
     pinned_post_prompt = f"Учитывая информацию о проекте, продуктах и контент план, напиши пост, который автор закрепит в телеграм. Пост должен вызвать интерес у людей, побудить записаться на консультацию, также укажи информацию о канале и авторе, о продуктах. Пост должен быть от 1500 до 2000 символов. Пиши на русском языке"
-    pinned_post, pinned_post_tokens = await ask_question(
+    pinned_post, pinned_post_tokens = await ask_gpt(
         pinned_post_prompt)
     HistoryFuncs.change_ppost(user_id, pinned_post)
     await message.edit_text(text=f"{pinned_post}\nЧтобы человек остался в канале, важно сразу дать ему понять, что ценного он здесь получит, поэтому я подготовил для тебя пост-закреп - оцени его и жми на кнопку ниже ", reply_markup=keyboards.to_fmenu_from_choices_kb)
@@ -613,7 +613,7 @@ async def shorts_results(callback: CallbackQuery):
     user_id = callback.from_user.id
     business_info, company_info, audience_info = HistoryFuncs.get_history(user_id)
     youtube_shorts_prompt = f"Учитывая информацию о проекте, продуктах и контент план, напиши пост, который автор закрепит в телеграм. Пост должен вызвать интерес у людей, побудить записаться на консультацию, также укажи информацию о канале и авторе, о продуктах. Пост должен быть от 1500 до 2000 символов. Пиши на русском языке"
-    youtube_shorts, youtube_shorts_tokens = await ask_question(
+    youtube_shorts = await ask_gpt(
         youtube_shorts_prompt)
     HistoryFuncs.change_shorts(user_id, youtube_shorts)
     await message.edit_text(
