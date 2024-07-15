@@ -18,5 +18,5 @@ async def ask_gpt(question):
         , messages=message
         , temperature=gpt_config['temperature']
     )
-
+    print('fffff', message, response, openai.api_key)
     return response.choices[0].message['content']
