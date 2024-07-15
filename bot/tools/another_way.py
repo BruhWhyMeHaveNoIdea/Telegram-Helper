@@ -12,7 +12,7 @@ async def ask_gpt(question):
         {'role': 'system', 'content': 'You are an assistant'},
         {'role': 'user', 'content': question}
         ]
-
+    print('fffff', message, openai.api_key)
     response = openai.chat.completions.create(
         model=gpt_config['model']
         , messages=message
