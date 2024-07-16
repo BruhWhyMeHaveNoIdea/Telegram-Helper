@@ -125,17 +125,12 @@ to_function_buttons = [
 
 to_function_menu = InlineKeyboardMarkup(inline_keyboard=to_function_buttons)
 
-sms_10 = InlineKeyboardMarkup(
-    inline_keyboard=[
-        [InlineKeyboardButton(text='Сообщение 10', callback_data='sms10')],
-        [InlineKeyboardButton(text='Сообщение 11', callback_data='sms11')]
-    ]
-)
-
 first = InlineKeyboardMarkup(
     inline_keyboard=[
         [InlineKeyboardButton(text='Составить оффер', callback_data='offer')],
-        [InlineKeyboardButton(text='Отправить клиенту', callback_data='send_to_client')]
+        [InlineKeyboardButton(text='Ответить клиенту', callback_data='send_to_client')],
+        [InlineKeyboardButton(text='Сообщение 19', callback_data='sms19')],
+        [InlineKeyboardButton(text='Сообщение 20', callback_data='sms20')]
                      ]
 )
 
@@ -151,38 +146,6 @@ sms_20 = InlineKeyboardMarkup(
     ]
 )
 
-second = InlineKeyboardMarkup(
-    inline_keyboard=[
-        [InlineKeyboardButton(text='Найти клиетов', callback_data='find_clients')],
-        [InlineKeyboardButton(text='Найти сотрудников', callback_data='find_staff')]
-    ]
-)
-
-sms_21 = InlineKeyboardMarkup(
-    inline_keyboard=[
-        [InlineKeyboardButton(text='Сообщение 21', callback_data='sms21')]
-    ]
-)
-
-sms_22 = InlineKeyboardMarkup(
-    inline_keyboard=[
-        [InlineKeyboardButton(text='Сообщение 22', callback_data='sms22')]
-    ]
-)
-
-category_keywords_21 = InlineKeyboardMarkup(
-    inline_keyboard=[
-        [InlineKeyboardButton(text='Выбрать категорию', callback_data='choice_category_21')],
-        [InlineKeyboardButton(text='Свои ключевые слова', callback_data='keywords_21')]
-    ]
-)
-
-category_keywords_22 = InlineKeyboardMarkup(
-    inline_keyboard=[
-        [InlineKeyboardButton(text='Выбрать категорию', callback_data='choice_category_22')],
-        [InlineKeyboardButton(text='Свои ключевые слова', callback_data='keywords_22')]
-    ]
-)
 
 restart_buttons_mark = [
     [
@@ -306,3 +269,18 @@ chara_buttons = [
     ]
 ]
 chara_keyboard = InlineKeyboardMarkup(inline_keyboard=chara_buttons)
+
+
+video_len_button = [[
+    InlineKeyboardButton(text="Короткое (5-10 минут)", callback_data="short_video")
+],
+    [
+        InlineKeyboardButton(text="Среднее (15-20 минут)", callback_data="average_video")
+    ],
+    [
+        InlineKeyboardButton(text="Длинное (25-30 минут)", callback_data="long_video")
+    ]
+]
+
+forward_buttons = [[InlineKeyboardButton(text="Вперёд", callback_data="forward_video")]]
+forward_video = InlineKeyboardMarkup(inline_keyboard=forward_buttons)
