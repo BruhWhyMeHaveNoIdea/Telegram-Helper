@@ -4,19 +4,15 @@ import logging
 import openai
 
 # Ваш API-ключ OpenAI
-
+openai.api_key = gpt_config['api_key']
 
 async def ask_gpt(question):
-    openai.api_key = gpt_config['api_key']
-    message = [
-        {'role': 'system', 'content': 'You are an assistant'},
-        {'role': 'user', 'content': question}
+    response = openai.ChatCompletion.acreate(
+        model="gpt-3.5-turbo",
+        messages=[
+            {"role": "system", "content": "Ты хороший помощник. На все вопросы отвечай на русском"},
+            {"role": "user", "content": question}
         ]
-
-    response = openai.ChatCompletion.create(
-        model=gpt_config['model']
-        , messages=message
-        , temperature=gpt_config['temperature']
     )
-
-    return response.choices[0].message['content']
+    print(response)
+    return None

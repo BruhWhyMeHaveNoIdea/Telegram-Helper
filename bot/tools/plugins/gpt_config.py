@@ -62,7 +62,8 @@ gpt_config = {
     'vision_detail': os.environ.get('VISION_DETAIL'),
     'enable_vision_follow_up_questions': os.environ.get('ENABLE_VISION_FOLLOW_UP_QUESTIONS').lower() == 'true',
     'vision_model': os.environ.get('VISION_MODEL'),
-    'db_connection_url': os.environ.get('DB_CONNECTION_URL')
+    'db_connection_url': os.environ.get('DB_CONNECTION_URL'),
+    'provider_token': os.environ.get('PROVIDER_TOKEN')
 }
 
 print(os.environ.get('OPENAI_API_KEY'))

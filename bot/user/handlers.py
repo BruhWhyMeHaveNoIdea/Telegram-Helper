@@ -1,7 +1,7 @@
 import datetime
 from aiogram import Router, F, Bot
 from aiogram.filters import Command
-from aiogram.types import CallbackQuery, Message, LabeledPrice
+from aiogram.types import CallbackQuery, Message, LabeledPrice, PreCheckoutQuery
 from aiogram.fsm.state import StatesGroup, State
 from aiogram.fsm.context import FSMContext
 import logging
@@ -31,12 +31,11 @@ logging.basicConfig(level=logging.INFO)
 
 @router.message(Command("start"))
 async def start_handler(message: Message):
-    start_time = datetime.datetime.now()
+    current_time = datetime.datetime.now()
     user_id=message.from_user.id
     logging.info("Команда /start вызвана")
     if NewUsersFuncs.user_in_database(user_id) and not(SubscriptionsFuncs.user_in_database(user_id)):
         logging.info("Пользователь уже в БД")
-        current_time = datetime.datetime.now()
         joined_time, joined_date = NewUsersFuncs.get_user_join_time(user_id)[1].split('.')[0].split(':'), NewUsersFuncs.get_user_join_time(user_id)[0].split('-')
         joined_time_and_date = datetime.datetime(year=int(joined_date[0]), month=int(joined_date[1]),\
                                                  day=int(joined_date[2]), hour=int(joined_time[0]),\
@@ -44,7 +43,15 @@ async def start_handler(message: Message):
         dif_time = (current_time-joined_time_and_date).total_seconds()
         if dif_time > 86400:
             await message.answer(text="Пробное время закончилось. Вы можете приобрести подписку, чтобы продолжить пользование ботом.")
-            return
+            return donation_menu(CallbackQuery)
+    elif (SubscriptionsFuncs.user_in_database(user_id)):
+        log_day, log_time = SubscriptionsFuncs.get_date(user_id)[0].split('-'), SubscriptionsFuncs.get_date(user_id)[1].split('.')[0].split[":"]
+        subscribed_time_and_day = datetime.datetime(year=log_time[0], month=log_day[1], day=log_day[2], hour=log_time[0], minute=log_time[1], second=log_time[2])
+        dif_time = (current_time-subscribed_time_and_day).total_seconds()
+        subscribed_day = SubscriptionsFuncs.get_days(user_id)
+        if dif_time > (subscribed_day*86400):
+            await message.answer(text="Подписка истекла")
+            return donation_menu(CallbackQuery)
     else:
         query = NewUsersModel(
         user_id=message.from_user.id,
@@ -69,46 +76,92 @@ async def main_menu_secound_handler(callback: CallbackQuery):
     await callback.message.edit_reply_markup(reply_markup=keyboards.main_menu_secound_keyboard)
 
 @router.callback_query(F.data == "donation")
-async def donation_menu(bot: Bot, callback: CallbackQuery):
+async def donation_menu(callback: CallbackQuery):
     user_id=callback.from_user.id
-    await bot.send_invoice(
-        chat_id=callback.message.chat.id,
-        title="Покупка ТГ",
-        description="Покупка через ТГ",
-        payload="Payment TG",
-        provider_token="381764678:TEST:89879",
-        currency='rub',
-        prices=[
-            LabeledPrice(
-                label="Доступ",
-                amount=99000
-            ),
-            LabeledPrice(
-                label="НДС",
-                amount=20000
-            ),
-            LabeledPrice(
-                label="Скидка",
-                amount=-20000
-            ),
-            LabeledPrice(
-                label="Бонус",
-                amount=-40000
-            )
-        ],
-        max_tip_amount=500,
-        suggested_tip_amounts=[1000, 2000],
-        start_parameter='hiii',
-        provider_data=None
-    )
-    '''
-    if SubscriptionsFuncs.is_subscribed(user_id):
+    if SubscriptionsFuncs.user_in_database(user_id):
         time_left= SubscriptionsFuncs.get_time(user_id)
         text = f"{time_left.split()[0]} дней, {time_left.split()[2].split(':')[0]} часов и {time_left.split()[2].split(':')[2]} минут"
-        await callback.message.edit_text(text=f"Осталось: {text}")
+        await callback.message.edit_text(text=f"Осталось: {text}", reply_markup=keyboards.subscribtion_buy_keyboard)
     else:
-        await callback.message.edit_text(text=f"У вас нет подписки")
-    '''
+        await callback.message.edit_text(text=f"У вас нет подписки", reply_markup=keyboards.subscribtion_buy_keyboard)
+
+@router.callback_query(F.data == "common_buy")
+async def sub_bay(callback: CallbackQuery, bot: Bot):
+    prices = [
+        LabeledPrice(label='Полнйы функционал', amount=10000)  # 1000 копеек = 10.00 рублей
+    ]
+    await bot.send_invoice(chat_id=callback.message.chat.id,
+                           title="Подписка на бота",
+                           description="Активация подписки на бота на 1 месяц",
+                           provider_token="381764678:TEST:89879",
+                           currency="rub",
+                           prices=prices,
+                           start_parameter="start",
+                           payload="test-invoice-payload")
+
+
+@router.pre_checkout_query(lambda query: True)
+async def pre_checkout_query(pre_checkout_query: PreCheckoutQuery, bot: Bot):
+    await bot.answer_pre_checkout_query(pre_checkout_query.id, ok=True)
+
+
+@router.message(F.successful_payment)
+async def successful_payment(message: Message, bot: Bot):
+    logging.info("SUCCESSFUL PAYMENT")
+    await bot.send_message(message.chat.id,
+        f"Платеж на сумму {message.successful_payment.total_amount // 100} {message.successful_payment.currency} прошел успешно!!!")
+    if SubscriptionsFuncs.user_in_database(message.from_user.id):
+        SubscriptionsFuncs.add_days(message.from_user.id,30, False)
+    else:
+        query = SubscriptionsModel(
+            user_id=message.from_user.id,
+            subscription_date=str(datetime.datetime.now().date),
+            subscription_time=str(datetime.datetime.now().time()),
+            subscription_days=30,
+            access_to_chats=False
+        )
+        SubscriptionsFuncs.add_new_user(query)
+
+
+@router.callback_query(F.data == "exclusive_buy")
+async def sub_bay(callback: CallbackQuery, bot: Bot):
+    prices = [
+        LabeledPrice(label='Полный функционал+Доступ к чатам', amount=10000)  # 1000 копеек = 10.00 рублей
+    ]
+    await bot.send_invoice(chat_id=callback.message.chat.id,
+                           title="Подписка на бота",
+                           description="Активация подписки на бота на 1 месяц",
+                           provider_token="381764678:TEST:89879",
+                           currency="rub",
+                           prices=prices,
+                           start_parameter="start",
+                           payload="test-invoice-payload")
+
+
+@router.pre_checkout_query(lambda query: True)
+async def pre_checkout_query(pre_checkout_query: PreCheckoutQuery, bot: Bot):
+    await bot.answer_pre_checkout_query(pre_checkout_query.id, ok=True)
+
+
+@router.message(F.successful_payment)
+async def successful_payment(message: Message, bot: Bot):
+    logging.info("SUCCESSFUL PAYMENT")
+    await bot.send_message(message.chat.id,
+        f"Платеж на сумму {message.successful_payment.total_amount // 100} {message.successful_payment.currency} прошел успешно!!!")
+    if SubscriptionsFuncs.user_in_database(message.from_user.id):
+        SubscriptionsFuncs.add_days(message.from_user.id,30, True)
+    else:
+        query = SubscriptionsModel(
+            user_id=message.from_user.id,
+            subscription_date=str(datetime.datetime.now().date),
+            subscription_time=str(datetime.datetime.now().time()),
+            subscription_days=30,
+            access_to_chats=True
+        )
+        SubscriptionsFuncs.add_new_user(query)
+
+
+
 
 @router.callback_query(F.data == 'sms10')
 async def process_sms10(callback: CallbackQuery):
@@ -242,35 +295,23 @@ async def third_block(callback: CallbackQuery):
     business_info, company_info, audience_info = HistoryFuncs.get_history(user_id)
     names_and_descriptions_prompt = f"Придумай название и описание для телеграм канала проекта со следующим описанием проекта - {business_info}. Учти также описание его аудитории - {audience_info}. И воспользуйся информацией о продуктах - {company_info}. Описание должно быть не более 255 символов, а название должно содержать от 2 до 4 слов. Предложи 10 идей названий, каждое название пиши на новой строке. Не давай каких-либо комментариев. Пиши на русском языке"
     marketing_strategy_plan_prompt = f"Ты маркетолог в телеграм, твои формулировки точны, просты, понятны любым клиентам :: Составь концепцию для маркетинга, который поможет грамотно вести телеграм канал со следующим описанием проекта - {business_info}. Учти также описание его аудитории - {audience_info}. И воспользуйся информацией о продуктах - {company_info}. :: Результат должен включать в себя развернутые 4 пункта :: 1 - описание каждого Продукта из списка предоставленной информацией о продуктах. Включать, что мы продаем, для кого мы это делаем и как мы это делаем. 2 - описание конкурентных преимуществ. Почему именно мы, чем мы лучше других, почему стоит выбрать именно нас. 3 - детальное описание целевой аудитории на базе предоствленных данных о целевой аудитории. Должно содержать - Кто наш клиент, чего он хочет, какие у него есть потребности и желания. 4 - Позиционирование. Кто мы, что мы делаем и для кого :: Выведи ответ без вводных фраз с подробным описанием на все пункты. Пиши на русском языке"
-    marketing_strategy_plan_response, marketing_strategy_plan_tokens = await ask_gpt(marketing_strategy_plan_prompt)
+    marketing_strategy_plan_response = await ask_gpt(marketing_strategy_plan_prompt)
     # done лид магнит должен включать генерацию marketing_strategy_plan_prompt
     lead_magnet_prompt = f"Придумай 5 идей лид-магнитов для телеграм канала и бизнеса в целом. Распиши подробно каждый лид-магнит в 15 тезисов. Учти описание проекта - {business_info}. Учти также описание его аудитории - {audience_info}. И воспользуйся информацией о продуктах - {company_info}. Также вопсользуйся следующей информацией про маркетинг проекта - {marketing_strategy_plan_response}. Пиши на русском языке. Не давай каких-либо комментариев."
-    lead_magnet_response, lead_magnet_tokens = await ask_gpt(lead_magnet_prompt)
+    lead_magnet_response = await ask_gpt(lead_magnet_prompt)
     # done контент план должен содержать генерации marketing_strategy_plan_prompt и lead_magnet_prompt
     content_plan_prompt = f'Создай контент план для телеграм канала на 7 дней, по 2 поста в день. Посты должны быть разные: продающие, вовлекающие, информационные, познавательные, опросы, отзывы, рассказ о продуктах эксперта. В посте указывать, какой это пост, как в примере ""Вечерний пост (Познавательный)"" :: Учти описание проекта - {business_info}. Учти также описание его аудитории - {audience_info}. И воспользуйся информацией о продуктах - {company_info}. Также воспользуйся следующей информацией про маркетинг проекта - {marketing_strategy_plan_response}:: также учти наличие следующих лиц-магнитов - {lead_magnet_response}. Пиши на русском языке. Не давай каких-либо комментариев.'
     # done контент план для сторис должен содержать генерации marketing_strategy_plan_prompt и lead_magnet_prompt
     stories_content_prompt = f"Создай контент план сторис для телеграм канала на 7 дней, который должен включать 21 сторис. Сторис должны быть разные: продающие, вовлекающие, информационные, познавательные, опросы, отзывы, рассказ о продуктах эксперта. :: Учти описание проекта - {business_info}. Учти также описание его аудитории - {audience_info}. И воспользуйся информацией о продуктах - {company_info}. Также воспользуйся следующей информацией про маркетинг проекта - {marketing_strategy_plan_response} :: также учти наличие следующих лиц-магнитов - {lead_magnet_response}. Пиши на русском языке. Не давай каких-либо комментариев."
     # ради интереса, проверить сохраняет ли гпт контекст | в любом случае выполнять генерацию промпта последним
     pinned_post_prompt = f"Учитывая информацию о проекте, продуктах и контент план, напиши пост, который автор закрепит в телеграм. Пост должен вызвать интерес у людей, побудить записаться на консультацию, также укажи информацию о канале и авторе, о продуктах. Пост должен быть от 1500 до 2000 символов. Пиши на русском языке"
-    names_and_descriptions_response, names_and_descriptions_total_tokens = await ask_gpt(names_and_descriptions_prompt)
-    pinned_post_response, pinned_post_tokens = await ask_gpt(pinned_post_prompt)
-    content_plan_response, content_plan_tokens = await ask_gpt(content_plan_prompt)
-    stories_content_response, stories_content_tokens = await ask_gpt(stories_content_prompt)
-
-
-    query = HistoryModel(
-        user_id = user_id,
-        about_business = business_info,
-        about_company = company_info,
-        about_audience = audience_info,
-        names_and_descriptions = names_and_descriptions,
-        marketing_strategy_plan = marketing_strategy_plan,
-        lead_magnet = lead_magnet,
-        pinned_post = pinned_post,
-        content_plan = content_plan,
-        stories_content = stories_content,
-    )
-    HistoryFuncs.edit_history(user_id, business_info, company_info, audience_info, names_and_descriptions, marketing_strategy_plan, lead_magnet, pinned_post, content_plan, stories_content)
+    names_and_descriptions_response = await ask_gpt(names_and_descriptions_prompt)
+    pinned_post_response = await ask_gpt(pinned_post_prompt)
+    content_plan_response = await ask_gpt(content_plan_prompt)
+    stories_content_response = await ask_gpt(stories_content_prompt)
+    HistoryFuncs.edit_history(user_id, business_info, company_info, audience_info, names_and_descriptions_response,\
+                              marketing_strategy_plan_response, lead_magnet_response, pinned_post_response,\
+                              content_plan_response, stories_content_response)
     await callback.message.edit_reply_markup(reply_markup=keyboards.to_function_menu)
 
 @router.callback_query(F.data == "next_keyboard1")
@@ -350,7 +391,7 @@ async def mark_results(callback: CallbackQuery):
     await callback.answer()
     business_info, company_info, audience_info = HistoryFuncs.get_history(user_id)
     marketing_strategy_plan_prompt = f"Ты маркетолог в телеграм, твои формулировки точны, просты, понятны любым клиентам :: Составь концепцию для маркетинга, который поможет грамотно вести телеграм канал со следующим описанием проекта - {business_info}. Учти также описание его аудитории - {audience_info}. И воспользуйся информацией о продуктах - {company_info}. :: Результат должен включать в себя развернутые 4 пункта :: 1 - описание каждого Продукта из списка предоставленной информацией о продуктах. Включать, что мы продаем, для кого мы это делаем и как мы это делаем. 2 - описание конкурентных преимуществ. Почему именно мы, чем мы лучше других, почему стоит выбрать именно нас. 3 - детальное описание целевой аудитории на базе предоствленных данных о целевой аудитории. Должно содержать - Кто наш клиент, чего он хочет, какие у него есть потребности и желания. 4 - Позиционирование. Кто мы, что мы делаем и для кого :: Выведи ответ без вводных фраз с подробным описанием на все пункты. Пиши на русском языке"
-    marketing_strategy_plan_response, marketing_strategy_plan_tokens = await ask_gpt(
+    marketing_strategy_plan_response = await ask_gpt(
         marketing_strategy_plan_prompt)
     HistoryFuncs.change_marketing(user_id, marketing_strategy_plan_response)
     await message.edit_text(text=f"Итак, вот идея маркетинга:\n {marketing_strategy_plan_response}", reply_markup=keyboards.to_fmenu_from_choices_kb)
@@ -432,7 +473,7 @@ async def post_results(callback: CallbackQuery):
     user_id = callback.from_user.id
     business_info, company_info, audience_info = HistoryFuncs.get_history(user_id)
     pinned_post_prompt = f"Учитывая информацию о проекте, продуктах и контент план, напиши пост, который автор закрепит в телеграм. Пост должен вызвать интерес у людей, побудить записаться на консультацию, также укажи информацию о канале и авторе, о продуктах. Пост должен быть от 1500 до 2000 символов. Пиши на русском языке"
-    pinned_post, pinned_post_tokens = await ask_gpt(
+    pinned_post = await ask_gpt(
         pinned_post_prompt)
     HistoryFuncs.change_ppost(user_id, pinned_post)
     await message.edit_text(text=f"{pinned_post}\nЧтобы человек остался в канале, важно сразу дать ему понять, что ценного он здесь получит, поэтому я подготовил для тебя пост-закреп - оцени его и жми на кнопку ниже ", reply_markup=keyboards.to_fmenu_from_choices_kb)
@@ -515,6 +556,7 @@ async def one_content_day(callback: CallbackQuery):
     user_id = callback.from_user.id
     business_info, company_info, audience_info = HistoryFuncs.get_history(user_id)
     content_plan_prompt = f'Создай контент план для телеграм канала на 1 день, по 2 поста. Посты должны быть разные: продающие, вовлекающие, информационные, познавательные, опросы, отзывы, рассказ о продуктах эксперта. В посте указывать, какой это пост, как в примере ""Вечерний пост (Познавательный)"" :: Учти описание проекта - {business_info}. Учти также описание его аудитории - {audience_info}. И воспользуйся информацией о продуктах - {company_info}. Также воспользуйся следующей информацией про маркетинг проекта - {marketing_strategy_plan_response}:: также учти наличие следующих лиц-магнитов - {lead_magnet_response}. Пиши на русском языке. Не давай каких-либо комментариев.'
+    content_plan = await ask_gpt(content_plan_prompt)
     HistoryFuncs.change_content(user_id, content_plan)
     await callback.message.edit_text(text=f"Отлично, вот такие посты нам точно стоит сделать в ближайший день\n {content_plan} \nХочешь, чтобы я написала каждый пост сама? 😍",
                             reply_markup=keyboards.to_fmenu_from_choices_kb)
@@ -526,7 +568,7 @@ async def three_content_day(callback: CallbackQuery):
     user_id = callback.from_user.id
     business_info, company_info, audience_info = HistoryFuncs.get_history(user_id)
     content_plan_prompt = f'Создай контент план для телеграм канала на 3 дня, по 2 поста в день. Посты должны быть разные: продающие, вовлекающие, информационные, познавательные, опросы, отзывы, рассказ о продуктах эксперта. В посте указывать, какой это пост, как в примере ""Вечерний пост (Познавательный)"" :: Учти описание проекта - {business_info}. Учти также описание его аудитории - {audience_info}. И воспользуйся информацией о продуктах - {company_info}. Также воспользуйся следующей информацией про маркетинг проекта - {marketing_strategy_plan_response}:: также учти наличие следующих лиц-магнитов - {lead_magnet_response}. Пиши на русском языке. Не давай каких-либо комментариев.'
-
+    content_plan = await ask_gpt(content_plan_prompt)
     HistoryFuncs.change_content(user_id, content_plan)
     await callback.message.edit_text(text=f"Отлично, вот такие посты нам точно стоит сделать в ближайшие 3 дня\n {content_plan} \nХочешь, чтобы я написала каждый пост сама? 😍",
                             reply_markup=keyboards.to_fmenu_from_choices_kb)
@@ -537,6 +579,7 @@ async def one_content_day(callback: CallbackQuery):
     user_id = callback.from_user.id
     business_info, company_info, audience_info = HistoryFuncs.get_history(user_id)
     content_plan_prompt = f'Создай контент план для телеграм канала на 7 дней, по 2 поста в день. Посты должны быть разные: продающие, вовлекающие, информационные, познавательные, опросы, отзывы, рассказ о продуктах эксперта. В посте указывать, какой это пост, как в примере ""Вечерний пост (Познавательный)"" :: Учти описание проекта - {business_info}. Учти также описание его аудитории - {audience_info}. И воспользуйся информацией о продуктах - {company_info}. Также воспользуйся следующей информацией про маркетинг проекта - {marketing_strategy_plan_response}:: также учти наличие следующих лиц-магнитов - {lead_magnet_response}. Пиши на русском языке. Не давай каких-либо комментариев.'
+    content_plan = await ask_gpt(content_plan_prompt)
     HistoryFuncs.change_content(user_id, content_plan)
     await callback.message.edit_text(text=f"Отлично, вот такие посты нам точно стоит сделать в ближайшую неделю\n {content_plan} \nХочешь, чтобы я написала каждый пост сама? 😍",
                             reply_markup=keyboards.to_fmenu_from_choices_kb)
@@ -615,7 +658,7 @@ async def shorts_results(callback: CallbackQuery):
         youtube_shorts_prompt)
     HistoryFuncs.change_shorts(user_id, youtube_shorts)
     await message.edit_text(
-        text=f"{pinned_post}\nЧтобы человек остался в канале, важно сразу дать ему понять, что ценного он здесь получит, поэтому я подготовил для тебя пост-закреп - оцени его и жми на кнопку ниже ",
+        text=f"{youtube_shorts}\nЧтобы человек остался в канале, важно сразу дать ему понять, что ценного он здесь получит, поэтому я подготовил для тебя пост-закреп - оцени его и жми на кнопку ниже ",
         reply_markup=keyboards.to_fmenu_from_choices_kb)
 
 @router.callback_query(F.data=="continue_questions_shorts")
@@ -623,7 +666,6 @@ async def skip_shorts(callback: CallbackQuery):
     await callback.answer()
     user_id = callback.from_user.id
     youtube_shorts = HistoryFuncs.get_gpt_history[5]
-    HistoryFuncs.change_shorts(user_id, youtube_shorts)
     await message.edit_text(
-        text=f"{pinned_post}\nЧтобы человек остался в канале, важно сразу дать ему понять, что ценного он здесь получит, поэтому я подготовил для тебя пост-закреп - оцени его и жми на кнопку ниже ",
+        text=f"{youtube_shorts}\nЧтобы человек остался в канале, важно сразу дать ему понять, что ценного он здесь получит, поэтому я подготовил для тебя пост-закреп - оцени его и жми на кнопку ниже ",
         reply_markup=keyboards.to_fmenu_from_choices_kb)

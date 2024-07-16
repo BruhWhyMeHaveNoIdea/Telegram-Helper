@@ -1,5 +1,5 @@
 from bot.database.database import Base
-from sqlalchemy import Column, String, Integer
+from sqlalchemy import Column, String, Integer, Boolean
 
 
 class Subscriptions(Base):
@@ -9,3 +9,4 @@ class Subscriptions(Base):
     subscription_date = Column(String, unique=False, nullable=False)
     subscription_time = Column(String, unique=False, nullable=False)
     subscription_days = Column(Integer, unique=False, nullable=False)
+    access_to_chats = Column(Boolean)
