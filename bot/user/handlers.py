@@ -6,12 +6,13 @@ from aiogram.fsm.state import StatesGroup, State
 from aiogram.fsm.context import FSMContext
 import logging
 from sqlalchemy.orm import sessionmaker
+from aiogram.utils.deep_linking import get_start_link, decode_payload
 
 
 
 
 from bot.tools.another_way import ask_gpt
-from bot.tools.plugins.gpt_config import gpt_config
+from bot.tools.plugins.config import config
 from bot.tools.plugin_manager import PluginManager
 from bot.database.database import engine
 import bot.user.texts as texts
@@ -61,10 +62,13 @@ async def start_handler(message: Message):
         NewUsersFuncs.add_new_user(query)
         logging.info("Пользователь зарегистрирован")
     logging.error("before start")
-    await message.answer(text=texts.hello_message, reply_markup=keyboards.to_main_menu_keyboard)
-    end_time = datetime.datetime.now()
-    duration = (end_time - start_time).total_seconds()
-    logging.info(f"Команда /start выполнена за {duration} секунд")
+    try:
+        args = message.get_args()
+        reference = decode_payload(args)
+        await message.answer(text=texts.hello_message+f"\n Ваш реферал {reference}", reply_markup=keyboards.to_main_menu_keyboard)
+    except:
+        await message.answer(text=texts.hello_message,
+                             reply_markup=keyboards.to_main_menu_keyboard)
 
 @router.callback_query(F.data == "to_mmenu")
 async def main_menu_handler(callback: CallbackQuery):
@@ -74,6 +78,13 @@ async def main_menu_handler(callback: CallbackQuery):
 @router.callback_query(F.data == "main_menu_secound")
 async def main_menu_secound_handler(callback: CallbackQuery):
     await callback.message.edit_reply_markup(reply_markup=keyboards.main_menu_secound_keyboard)
+
+@router.callback_query(F.data=="referal_system")
+async def referal(callback: CallbackQuery):
+    await callback.answer()
+    referal_url = await get_start_link(str(message.from_user.username), encode=True)
+    await message.answer(text=f"Ваша реферальная ссылка: {referal_url}", reply_markup=keyboards.to_main_menu_keyboard)
+
 
 @router.callback_query(F.data == "donation")
 async def donation_menu(callback: CallbackQuery):
@@ -88,7 +99,7 @@ async def donation_menu(callback: CallbackQuery):
 @router.callback_query(F.data == "common_buy")
 async def sub_bay(callback: CallbackQuery, bot: Bot):
     prices = [
-        LabeledPrice(label='Полнйы функционал', amount=10000)  # 1000 копеек = 10.00 рублей
+        LabeledPrice(label='Полный функционал', amount=10000)  # 1000 копеек = 10.00 рублей
     ]
     await bot.send_invoice(chat_id=callback.message.chat.id,
                            title="Подписка на бота",
@@ -402,88 +413,6 @@ async def mark_skip(callback: CallbackQuery):
     mark_results = HistoryFuncs.get_gpt_history(user_id)[1]
     await callback.message.edit_text(text= f"Вот маркетинг:\n {mark_results}", reply_markup=keyboards.to_fmenu_from_choices_kb)
 
-
-
-@router.callback_query(F.data == "create_post")
-async def create_post(callback: CallbackQuery):
-    await callback.answer()
-    user_id = callback.from_user.id
-    if None in HistoryFuncs.get_gpt_history(user_id):
-        await callback.message.edit_text(text="К сожалению, у нас не сохранились ваши ответы. Придется пройти заного")
-        return restart_post(callback, state)
-    await callback.message.answer(
-        text="Напомню, что уже немного знаю о твоем проекте, если ты хочешь получить решение по готовой информации - выбери нужную кнопку. Если хочешь “все … давай по новой” - выбери другую кнопку 😁",
-        reply_markup=keyboards.restart_keyboard_post
-)
-
-class RestartQuestionsPost(StatesGroup):
-    First = State()
-    Second = State()
-    Third = State()
-
-@router.callback_query(F.data == "restart_questions_post")
-async def restart_post(callback: CallbackQuery, state: FSMContext):
-    await callback.answer()
-    await callback.message.delete()
-    await callback.message.answer(text=texts.message1_1)
-    await state.set_state(RestartQuestionsPost.First)
-
-@router.message(RestartQuestionsPost.First)
-async def first_restarted_answer(message: Message, state: FSMContext):
-    await state.update_data({"business": message.text})
-    await message.answer(text=texts.message2)
-    await state.set_state(RestartQuestionsMark.Second)
-
-@router.message(RestartQuestionsPost.Second)
-async def second_restarted_answer(message: Message, state: FSMContext):
-    await state.update_data({"company": message.text})
-    await message.answer(text=texts.message3)
-    await state.set_state(RestartQuestionsPost.Third)
-
-@router.message(RestartQuestionsPost.Third)
-async def third_restarted_question(message: Message, state: FSMContext):
-    await state.update_data({"audio": message.text})
-    user_id = message.from_user.id
-    data = await state.get_data()
-    await state.clear()
-    business, company, audience = data["business"], data["company"], data["audio"]
-    query = HistoryModel(
-        user_id=user_id,
-        about_business=business,
-        about_company=company,
-        about_audience=audience,
-        names_and_descriptions="",
-        marketing_strategy_plan="",
-        lead_magnet="",
-        pinned_post="",
-        content_plan="",
-        stories_content="",
-    )
-    if HistoryFuncs.user_in_database(user_id):
-        HistoryFuncs.edit_history(id=user_id, new_business=business, new_company=company, new_audience=audience)
-    else:
-        HistoryFuncs.add_new_user(query)
-    logging.info(f"История пользователя '{user_id}' сохранена.")
-    await message.answer(text="Итак, я поразмышляла над идеей. Скорее жми на кнопку, чтобы я могла поделиться ею с тобой", reply_markup=keyboards.continue_post)
-
-
-@router.callback_query(F.data=="post_results")
-async def post_results(callback: CallbackQuery):
-    await callback.answer()
-    user_id = callback.from_user.id
-    business_info, company_info, audience_info = HistoryFuncs.get_history(user_id)
-    pinned_post_prompt = f"Учитывая информацию о проекте, продуктах и контент план, напиши пост, который автор закрепит в телеграм. Пост должен вызвать интерес у людей, побудить записаться на консультацию, также укажи информацию о канале и авторе, о продуктах. Пост должен быть от 1500 до 2000 символов. Пиши на русском языке"
-    pinned_post = await ask_gpt(
-        pinned_post_prompt)
-    HistoryFuncs.change_ppost(user_id, pinned_post)
-    await message.edit_text(text=f"{pinned_post}\nЧтобы человек остался в канале, важно сразу дать ему понять, что ценного он здесь получит, поэтому я подготовил для тебя пост-закреп - оцени его и жми на кнопку ниже ", reply_markup=keyboards.to_fmenu_from_choices_kb)
-
-@router.callback_query(F.data=='continue_questions_post')
-async def post_skip(callback: CallbackQuery):
-    user_id = callback.from_user.id
-    post_result = HistoryFuncs.get_gpt_history(user_id)[3]
-    await callback.message.edit_text(text= f"{post_result}\nЧтобы человек остался в канале, важно сразу дать ему понять, что ценного он здесь получит, поэтому я подготовил для тебя пост-закреп - оцени его ниже и жми на кнопку ниже ", reply_markup=keyboards.to_fmenu_from_choices_kb)
-
 @router.callback_query(F.data == "create_content_plan")
 async def create_content_plan(callback: CallbackQuery):
     await callback.answer()
@@ -585,48 +514,76 @@ async def one_content_day(callback: CallbackQuery):
                             reply_markup=keyboards.to_fmenu_from_choices_kb)
 
 
+shorts_query = f"Распиши 3 сценариев коротких видео по теме {user.channel_description} :: указав место съемки, раскадровку с числом секунд :: Полный текст, описание ролика с призывом к действию. Ответ должен быть на Русском языке. При создания сценария можно использовать один из методов по списку ниже: 1. Метод «скользкой горки» 2. Техника «шевеления занавеса» 3. Техника «Ложных следов» 4. Метод «Внутренний конфликт» 5. Техника «Крючок»"
+
+class Shorts(StatesGroup):
+    First = State()
+
+
 @router.callback_query(F.data == "create_shorts")
-async def create_shorts(callback: CallbackQuery):
+async def create_shorts(callback: CallbackQuery, state: FSMContext):
     await callback.answer()
-    user_id = callback.from_user.id
-    if None in HistoryFuncs.get_gpt_history(user_id):
-        await callback.message.edit_text(text="К сожалению, у нас не сохранились ваши ответы. Придется пройти заного")
-        return restart_content(callback, state)
-    await callback.message.edit_text(
-        text="Напомню, что уже немного знаю о твоем проекте, если ты хочешь получить решение по готовой информации - выбери нужную кнопку. Если “все …, давай по новой” - выбери другую кнопку 😁",
-        reply_markup=keyboards.restart_keyboard_shorts)
+    await callback.message.answer(text="Итак, прежде чем мы начнем, сообщите, о чем будет наш youtube-shorts? Ответ начинайте с 'О...', например: 'О животных'. Помните, чем больше вы напишите, тем лучше")
+    await state.set_state(Shorts.First)
+
+@router.message(Shorts.First)
+async def shorts_about(message: Message):
+    msg = message.text
+    await message.answer(text="Такс, дай мне секунду подумать...")
+    shorts_query = f"Распиши 3 сценариев коротких видео по теме {msg} :: указав место съемки, раскадровку с числом секунд :: Полный текст, описание ролика с призывом к действию. Ответ должен быть на Русском языке. При создания сценария можно использовать один из методов по списку ниже: 1. Метод «скользкой горки» 2. Техника «шевеления занавеса» 3. Техника «Ложных следов» 4. Метод «Внутренний конфликт» 5. Техника «Крючок»"
+    shorts_response = await ask_gpt(shorts_query)
+    await message.edit_text(text=f'Вот идеи для youtube-shorts на заданную вами тему:\n\n{shorts_response}', reply_markup=keyboards.to_fmenu_from_choices_kb)
 
 
-class RestartQuestionsShorts(StatesGroup):
+@router.callback_query(F.data == "create_post")
+async def create_post(callback: CallbackQuery):
+    await callback.answer()
+    await callback.message.answer(text="Отлично - люблю писать посты. Можем воспользоваться заготовленными материалами, либо ввести новые данные о твоем канале - а еще ты можешь полностью сам сформулировать нужный запрос, и я адаптирую пост под формат телеграмма 😁", reply_markup=keyboards.restart_keyboard_post)
+
+@router.callback_query(F.data == "continue_questions_post")
+async def skip_questions_post(callback: CallbackQuery):
+    await callback.answer()
+    await callback.message.answer(text='Хорошо, будем использовать старые ответы. Теперь необходимо определиться, от чьего лица будут писаться посты?', reply_markup=keyboards.face_keyboard)
+
+@router.callback_query(F.data == "restart_questions_post")
+async def restart_post(callback: CallbackQuery):
+    await callback.answer()
+    await callback.message.answer(text="Хорошо. Желаете ли вы сами написать о чем будет пост, или предпочтете ответить по формам?", reply_markup=keyboards.post_choose)
+
+
+class RestartQuestionsPost(StatesGroup):
     First = State()
     Second = State()
     Third = State()
 
-@router.callback_query(F.data == "restart_questions_shorts")
-async def restart_content(callback: CallbackQuery):
+@router.callback_query(F.data == "post_by_bot")
+async def post_by_bot(callback: CallbackQuery, state: FSMContext):
     await callback.answer()
     await callback.message.delete()
     await callback.message.answer(text=texts.message1_1)
-    await state.set_state(RestartQuestionsShorts.First)
+    await state.set_state(RestartQuestionsPost.First)
 
-@router.message(RestartQuestionsShorts.First)
+
+@router.message(RestartQuestionsPost.First)
 async def first_restarted_answer(message: Message, state: FSMContext):
     await state.update_data({"business": message.text})
     await message.answer(text=texts.message2)
-    await state.set_state(RestartQuestionsShorts.Second)
+    await state.set_state(RestartQuestionsPost.Second)
 
-@router.message(RestartQuestionsShorts.Second)
+
+@router.message(RestartQuestionsContent.Second)
 async def second_restarted_answer(message: Message, state: FSMContext):
     await state.update_data({"company": message.text})
     await message.answer(text=texts.message3)
-    await state.set_state(RestartQuestionsShorts.Third)
+    await state.set_state(RestartQuestionsPost.Third)
 
-@router.message(RestartQuestionsShorts.Third)
+
+@router.message(RestartQuestionsContent.Third)
 async def third_restarted_question(message: Message, state: FSMContext):
     await state.update_data({"audio": message.text})
     user_id = message.from_user.id
     data = await state.get_data()
-    await state.clear()
+    await state.set_state()
     business, company, audience = data["business"], data["company"], data["audio"]
     query = HistoryModel(
         user_id=user_id,
@@ -645,27 +602,70 @@ async def third_restarted_question(message: Message, state: FSMContext):
     else:
         HistoryFuncs.add_new_user(query)
     logging.info(f"История пользователя '{user_id}' сохранена.")
-    await message.answer(text="Итак, я поразмышляла над идеей. Скорее ознакомься с планом ниже по кнопке!", reply_markup=keyboards.continue_shorts)
+    await message.answer(
+        text="Хорошо. Теперь необходимо определиться, от чьего лица будут писаться посты",
+        reply_markup=keyboards.face_keyboard)
 
-
-@router.callback_query(F.data == "shorts_results")
-async def shorts_results(callback: CallbackQuery):
+@router.callback_query(F.data == "from_me")
+async def from_me(callback: CallbackQuery):
     await callback.answer()
-    user_id = callback.from_user.id
-    business_info, company_info, audience_info = HistoryFuncs.get_history(user_id)
-    youtube_shorts_prompt = f"Учитывая информацию о проекте, продуктах и контент план, напиши пост, который автор закрепит в телеграм. Пост должен вызвать интерес у людей, побудить записаться на консультацию, также укажи информацию о канале и авторе, о продуктах. Пост должен быть от 1500 до 2000 символов. Пиши на русском языке"
-    youtube_shorts = await ask_gpt(
-        youtube_shorts_prompt)
-    HistoryFuncs.change_shorts(user_id, youtube_shorts)
-    await message.edit_text(
-        text=f"{youtube_shorts}\nЧтобы человек остался в канале, важно сразу дать ему понять, что ценного он здесь получит, поэтому я подготовил для тебя пост-закреп - оцени его и жми на кнопку ниже ",
-        reply_markup=keyboards.to_fmenu_from_choices_kb)
+    await state.update_data({"face": "Я"})
+    await callback.message.edit_text(text="Теперь необходимо определиться с тоном, как мы будем обращаться к читателям?", reply_markup=keyboards.tone_keyboard)
 
-@router.callback_query(F.data=="continue_questions_shorts")
-async def skip_shorts(callback: CallbackQuery):
+@router.callback_query(F.data=="from_us")
+async def from_us(callback: CallbackQuery):
     await callback.answer()
+    await state.update_data({"face": "Мы"})
+    await callback.message.edit_text(text="Теперь необходимо определиться с тоном, как мы будем обращаться к читателям?", reply_markup=keyboards.tone_keyboard)
+
+@router.callback_query(F.data=="friendly_tone")
+async def friendly_tone(callback: CallbackQuery):
+    await callback.answer()
+    await state.update_data({"tone": "Дружелюбный"})
+    await callback.message.edit_text(text="Каким будет характер поста?", reply_markup=keyboards.chara_keyboard)
+
+@router.callback_query(F.data=="classic_tone")
+async def classic_tone(callback: CallbackQuery):
+    await callback.answer()
+    await state.update_data({"tone": "Классический"})
+    await callback.message.edit_text(text="Каким будет характер поста?", reply_markup=keyboards.chara_keyboard)
+
+@router.callback_query(F.data=="serious_tone")
+async def serious_tone(callback: CallbackQuery):
+    await callback.answer()
+    await state.update_data({"tone": "Строгий"})
+    await callback.message.edit_text(text="Какого характера у нас будет пост? Для каких целей мы его пишем?", reply_markup=keyboards.chara_keyboard)
+
+@router.callback_query(F.data=="advert")
+async def advert_chara(callback: CallbackQuery):
+    await callback.answer()
+    await state.update_data({"chara": "Рекламный"})
+    await callback.message.edit_text(text="Так-с, все данные получены, дай мне секунду на подумать...", reply_markup=None)
+    data = state.get_data()
+    await state.clear()
+    face, tone, chara = data["face"], data["tone"], date["chara"]
     user_id = callback.from_user.id
-    youtube_shorts = HistoryFuncs.get_gpt_history[5]
-    await message.edit_text(
-        text=f"{youtube_shorts}\nЧтобы человек остался в канале, важно сразу дать ему понять, что ценного он здесь получит, поэтому я подготовил для тебя пост-закреп - оцени его и жми на кнопку ниже ",
-        reply_markup=keyboards.to_fmenu_from_choices_kb)
+    business_info, company_info, audio_info = HistoryFuncs.get_history(user_id)
+    post_prompt = f"Создай 3 поста для телеграм бота для бизнеса с описанием {business_info}, основной продукт которого {company_info}. Также учитывай и целевую аудиторию бота, {audio_info}. Все посты пиши от '{face}', с {tone} тоном. Помимо этого, все посты должны иметь {chara} характер."
+    post = await ask_gpt(post_prompt)
+    await callback.message.edit_text(text=f"Держи посты! Можешь добавить их в отложенный постинг и прикрепить фотографии - подписчикам будет еще интереснее:\n{post}", reply_markup=keyboards.to_fmenu_from_choices_kb)
+
+
+class InfoUser(StatesGroup):
+    First = State()
+
+
+@router.callback_query(F.data == "post_by_user")
+async def post_by_user(callback: CallbackQuery, state: FSMContext):
+    await callback.answer()
+    await callback.message.answer(text="Тогда напиши - о чем нужен пост, в каком стиле его написать, каким тоном говорить и в целом - буду рада, если сможешь мне излить душу в этом посте и выложить максимум вводных данных.", reply_markup=None)
+    await state.set_state(InfoUser.First)
+
+@router.message(InfoUser.First)
+async def post_written(message: Message, state: FSMContext):
+    await state.clear()
+    msg = message.text
+    usiness_info, company_info, audio_info = HistoryFuncs.get_history(user_id)
+    post_prompt = f"Создай 3 поста для телеграм бота для бизнеса с описанием {business_info}, основной продукт которого {company_info}. Также учитывай и целевую аудиторию бота, {audio_info}. Учитывай пожелания пользователя: {msg}"
+    post = await ask_gpt(post_prompt)
+    await message.answer(text=f"Держи посты! Можешь добавить их в отложенный постинг и прикрепить фотографии - подписчикам будет еще интереснее:\n{post}")

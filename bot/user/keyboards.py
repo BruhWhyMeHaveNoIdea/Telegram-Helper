@@ -43,7 +43,7 @@ main_menu_secound_buttons = [
         InlineKeyboardButton(text="Сообщение 3", callback_data="first")
     ],
     [
-        InlineKeyboardButton(text="Сообщение 4", callback_data="donation"),
+        InlineKeyboardButton(text="Сообщение 4", callback_data="referal_and_donation"),
         InlineKeyboardButton(text="Сообщение 6", callback_data="first"),
     ],
     [
@@ -54,7 +54,14 @@ main_menu_secound_buttons = [
 
 main_menu_secound_keyboard = InlineKeyboardMarkup(inline_keyboard=main_menu_secound_buttons)
 
+refer_donat_buttons = [
+    [
+        InlineKeyboardButton(text="Подписка", callback_data="donation"),
+        InlineKeyboardButton(text="Реферальная программа", callback_data="referal_system")
+    ]
+]
 
+refer_donat_kb = InlineKeyboardMarkup(inline_keyboard=refer_donat_buttons)
 
 business_buttons = [
     [
@@ -66,6 +73,9 @@ business_buttons = [
     [
         InlineKeyboardButton(text="Найти клиентов / сотрудников", callback_data="found_people"),
     ],
+    [
+        InlineKeyboardButton(text="Назад", callback_data="to_mmenu")
+    ]
 ]
 
 business_keyboard = InlineKeyboardMarkup(inline_keyboard=business_buttons)
@@ -201,24 +211,6 @@ restart_buttons_content = [
 
 restart_keyboard_content = InlineKeyboardMarkup(inline_keyboard=restart_buttons_content)
 
-restart_buttons_shorts = [
-    [
-        InlineKeyboardButton(text="Начать заного", callback_data="restart_questions_shorts"),
-        InlineKeyboardButton(text="Оставить прежние", callback_data="continue_questions_shorts")
-    ]
-]
-
-restart_keyboard_shorts = InlineKeyboardMarkup(inline_keyboard=restart_buttons_shorts)
-
-restart_buttons_video = [
-    [
-        InlineKeyboardButton(text="Начать заного", callback_data="restart_questions_video"),
-        InlineKeyboardButton(text="Оставить прежние", callback_data="continue_questions_video")
-    ]
-]
-
-restart_keyboard_video = InlineKeyboardMarkup(inline_keyboard=restart_buttons_video)
-
 restart_buttons_magnet = [
     [
         InlineKeyboardButton(text="Начать заного", callback_data="restart_questions_magnet"),
@@ -266,7 +258,6 @@ self_post_buttons = [
 ]
 
 
-
 subscribtion_buy_buttons = [
     [
         InlineKeyboardButton(text='Подписка "Весь функционал" за 3.490₽', callback_data="common_buy")
@@ -277,3 +268,41 @@ subscribtion_buy_buttons = [
 ]
 
 subscribtion_buy_keyboard =InlineKeyboardMarkup(inline_keyboard=subscribtion_buy_buttons)
+
+
+post_buttons = [
+    [
+        InlineKeyboardButton(text='Сам', callback_data="post_by_user"),
+        InlineKeyboardButton(text='По формам', callback_data="post_by_bot")
+    ]
+]
+post_choose=InlineKeyboardMarkup(inline_keyboard=post_buttons)
+
+
+face_buttons = [
+    [
+        InlineKeyboardButton(text="От 'Я'", callback_data="from_me"),
+        InlineKeyboardButton(text="От 'Мы'", callback_data="from us")
+    ]
+]
+
+face_keyboard = InlineKeyboardMarkup(inline_keyboard=face_buttons)
+
+tone_buttons = [
+    [InlineKeyboardButton(text="Дружелюбный", callback_data="friendly_tone")],
+    [InlineKeyboardButton(text="Классический",callback_data="classic_tone")],
+    [InlineKeyboardButton(text="Строгий",callback_data="serious_tone")]
+]
+tone_keyboard = InlineKeyboardMarkup(inline_keyboard=tone_buttons)
+
+chara_buttons = [
+    [
+        InlineKeyboardButton(text="Рекламный", callback_data="advert"),
+        InlineKeyboardButton(text="Информационный", callback_data="information")
+    ],
+    [
+        InlineKeyboardButton(text="Продающий",callback_data="selling"),
+        InlineKeyboardButton(text="Развлекательный",callback_data="fun")
+    ]
+]
+chara_keyboard = InlineKeyboardMarkup(inline_keyboard=chara_buttons)

@@ -1,5 +1,5 @@
 import requests
-from bot.tools.plugins.gpt_config import gpt_config
+from bot.tools.plugins.config import config
 import logging
 import openai
 

@@ -1,8 +1,11 @@
 from sqlalchemy.orm import declarative_base
 from sqlalchemy import create_engine
 import config
+from bot.tools.plugins.config import config
 
-engine = create_engine(config.DB_CONNECTION_URL, echo=True)
+db_url = config['db_url']
+
+engine = create_engine(db_url, echo=True)
 Base = declarative_base()
 
 
