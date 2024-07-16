@@ -4,7 +4,7 @@ import logging
 import openai
 
 # Ваш API-ключ OpenAI
-openai.api_key = gpt_config['api_key']
+openai.api_key = config['api_key']
 
 async def ask_gpt(question):
     response = openai.ChatCompletion.acreate(

@@ -6,7 +6,7 @@ from aiogram.fsm.state import StatesGroup, State
 from aiogram.fsm.context import FSMContext
 import logging
 from sqlalchemy.orm import sessionmaker
-from aiogram.utils.deep_linking import get_start_link, decode_payload
+from aiogram.utils.deep_linking import create_start_link, decode_payload
 
 
 
@@ -82,7 +82,7 @@ async def main_menu_secound_handler(callback: CallbackQuery):
 @router.callback_query(F.data=="referal_system")
 async def referal(callback: CallbackQuery):
     await callback.answer()
-    referal_url = await get_start_link(str(message.from_user.username), encode=True)
+    referal_url = await create_start_link(str(message.from_user.username), encode=True)
     await message.answer(text=f"Ваша реферальная ссылка: {referal_url}", reply_markup=keyboards.to_main_menu_keyboard)
 
 
@@ -512,9 +512,6 @@ async def one_content_day(callback: CallbackQuery):
     HistoryFuncs.change_content(user_id, content_plan)
     await callback.message.edit_text(text=f"Отлично, вот такие посты нам точно стоит сделать в ближайшую неделю\n {content_plan} \nХочешь, чтобы я написала каждый пост сама? 😍",
                             reply_markup=keyboards.to_fmenu_from_choices_kb)
-
-
-shorts_query = f"Распиши 3 сценариев коротких видео по теме {user.channel_description} :: указав место съемки, раскадровку с числом секунд :: Полный текст, описание ролика с призывом к действию. Ответ должен быть на Русском языке. При создания сценария можно использовать один из методов по списку ниже: 1. Метод «скользкой горки» 2. Техника «шевеления занавеса» 3. Техника «Ложных следов» 4. Метод «Внутренний конфликт» 5. Техника «Крючок»"
 
 class Shorts(StatesGroup):
     First = State()

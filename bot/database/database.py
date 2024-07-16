@@ -1,6 +1,5 @@
 from sqlalchemy.orm import declarative_base
 from sqlalchemy import create_engine
-import config
 from bot.tools.plugins.config import config
 
 db_url = config['db_url']
