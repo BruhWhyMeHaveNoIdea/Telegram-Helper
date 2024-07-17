@@ -284,3 +284,10 @@ video_len_button = [[
 
 forward_buttons = [[InlineKeyboardButton(text="Вперёд", callback_data="forward_video")]]
 forward_video = InlineKeyboardMarkup(inline_keyboard=forward_buttons)
+
+
+sales_assistance_b = [[InlineKeyboardButton(text="Запустить помощника", callback_data="start_helper")],
+                      [InlineKeyboardButton(text="Очистить контекст", callback_data="clear_data")],
+                      [InlineKeyboardButton(text="Назад", callback_data="business_assistant")]]
+
+sales_assistance= InlineKeyboardMarkup(inline_keyboard=sales_assistance_b)

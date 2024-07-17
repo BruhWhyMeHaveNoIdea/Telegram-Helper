@@ -8,7 +8,7 @@ import logging
 from sqlalchemy.orm import sessionmaker
 from aiogram.utils.deep_linking import create_start_link, decode_payload
 
-from bot.tools.gpt import ask_gpt
+from bot.tools.gpt import ask_gpt, AdvancedGPT
 from bot.tools.plugins.config import config
 from bot.tools.plugin_manager import PluginManager
 from bot.database.database import engine
@@ -810,4 +810,145 @@ async def forward_video(callback: CallbackQuery, state: FSMContext):
 @router.callback_query(F.data == "sales_assistance")
 async def sales_assistance(callback: CallbackQuery):
     await callback.answer()
-    await callback.message.answer(text="Сообщение 10", reply_markup=None)
+    await callback.message.answer(text="Сообщение 10", reply_markup=keyboard.sales_assistance)
+
+class GPT_dialogue(StatesGroup):
+    First = State()
+
+
+@router.callback_query(F.data == "clear_data")
+async def clear_data(callback: CallbackQuery, message: Message):
+    await callback.answer()
+    user_id = callback.from_user.id
+    if user_id in user_histories:
+        del user_histories[user_id]
+        await message.answer(text="Контекст очищен!")
+    else:
+        await message.answer(text="История пуста!")
+    return await sales_assistance(callback)
+
+@router.callback_query(F.data == "start_helper")
+async def start_helper(callback: CallbackQuery, state: FSMContext):
+    await callback.answer()
+    await callback.message.answer(text="Отправляйте сообщение. Если пожелаете закончить, напишите 'Закончить'")
+    await state.set_state(GPT_dialogue.First)
+
+user_histories = {}
+SYSTEM_MESSAGE = {
+    "role": "system",
+    "content": """Ты - ассистент по продажам, тебя интегрируют в бота, который будет выполнять следующую функцию 
+                            Я буду отправлять тебе сообщения своего клиента, а твоя задача - на них отвечать, чтобы выполнить какую-либо цель от диалога с клиентом. Мне пишут люди в мессенджер и мне нужно им ответить, тебе нужно представить, что ты продавец и придумывать за меня ответы и полностью вести диалог.
+                            Тебе важно учесть следующие требования
+                            1. Необходимо создавать ощущение, что диалог идет с человеком 
+                            2. Ответы должны быть краткие, точные и меткие 
+                            3. Не должно быть лишних слов 
+                            4. Не надо сразу продавать лоб 
+                            5. Нужно закрывать возражения и вести человека к покупке 
+                            Тебе важно использовать знания из литературы и книг по маркетингу в том числе 
+                            Сейчас я отправлю тебе информацию для создания контекста о своем бизнесе, чтобы получить максимум информации, задай мне уточняющие вопросы, когда вопросы будут окончены, напиши «отлично, теперь можешь прислать мне сообщение клиента"
+                            """
+}
+
+@router.message(GPT_dialogue.First)
+async def dialogue_with_GPT(callback: CallbackQuery, message: Message):
+    user_id = message.from_user.id
+    msg = message.text
+    if msg.lower() == "закончить":
+        await message.answer(text="Прекращаем диалог")
+        return sales_assistance(callback)
+    if user_id not in user_histories:
+        user_histories[user_id] = [SYSTEM_MESSAGE]
+
+    user_histories[user_id].append({"role": "user", "content": user_input})
+
+    response = await openai.ChatCompletion.acreate(
+        model=config['model'],
+        messages=user_histories[user_id]
+    )
+
+    bot_response = response.choices[0].message['content']
+    user_histories[user_id].append({"role": "assistant", "content": bot_response})
+    await message.answer(text=bot_response)
+
+
+
+@router.callback_query(F.data == "create_lead_magnet")
+async def create_lead_magnet(callback: CallbackQuery):
+    await callback.answer()
+    await callback.message.answer(text="Желаете использовать старые ответы, или введете новые?", reply_markup=keyboards.restart_keyboard_magnet)
+
+class RestartQuestionsMagnet(StatesGroup):
+    First = State()
+    Second = State()
+    Third = State()
+
+
+@router.callback_query(F.data == "restart_questions_magnet")
+async def restart_questions_magnet(callback: CallbackQuery, state: FSMContext):
+    await callback.answer()
+    await callback.message.delete()
+    await callback.message.answer(text=texts.message1_1)
+    await state.set_state(RestartQuestionsMagnet.First)
+
+
+@router.message(RestartQuestionsMagnet.First)
+async def first_restarted_answer(message: Message, state: FSMContext):
+    await state.update_data({"business": message.text})
+    await message.answer(text=texts.message2)
+    await state.set_state(RestartQuestionsMagnet.Second)
+
+
+@router.message(RestartQuestionsMagnet.Second)
+async def second_restarted_answer(message: Message, state: FSMContext):
+    await state.update_data({"company": message.text})
+    await message.answer(text=texts.message3)
+    await state.set_state(RestartQuestionsMagnet.Third)
+
+
+@router.message(RestartQuestionsMagnet.Third)
+async def third_restarted_question(message: Message, state: FSMContext):
+    await state.update_data({"audio": message.text})
+    user_id = message.from_user.id
+    data = await state.get_data()
+    await state.clear()
+    business, company, audience = data["business"], data["company"], data["audio"]
+    query = HistoryModel(
+        user_id=user_id,
+        about_business=business,
+        about_company=company,
+        about_audience=audience,
+        names_and_descriptions="",
+        marketing_strategy_plan="",
+        lead_magnet="",
+        pinned_post="",
+        content_plan="",
+        stories_content="",
+    )
+    if HistoryFuncs.user_in_database(user_id):
+        HistoryFuncs.edit_history(id=user_id, new_business=business, new_company=company, new_audience=audience)
+    else:
+        HistoryFuncs.add_new_user(query)
+    logging.info(f"История пользователя '{user_id}' сохранена.")
+    await message.answer(
+        text="Мне надо некоторое время на подумать, подождите пожалуйста пару минут",
+        reply_markup=keyboards.continue_magnet)
+
+@router.callback_query(F.data == "magnet_results")
+async def magnet_results(callback: CallbackQuery):
+    await callback.answer()
+    user_id = callback.from_user.id
+    business_info, company_info, audience_info = HistoryFuncs.get_history(user_id)
+    marketing_strategy_plan_response = HistoryFuncs.get_gpt_history(user_id)[1]
+    lead_magnet_prompt = f"Придумай 5 идей лид-магнитов для телеграм канала и бизнеса в целом. Распиши подробно каждый лид-магнит в 15 тезисов. Учти описание проекта - {business_info}. Учти также описание его аудитории - {audience_info}. И воспользуйся информацией о продуктах - {company_info}. Также вопсользуйся следующей информацией про маркетинг проекта - {marketing_strategy_plan_response}. Пиши на русском языке. Не давай каких-либо комментариев."
+    lead_magnet = await ask_gpt(lead_magnet_prompt)
+    HistoryFuncs.change_magnet(user_id, lead_magnet)
+    await callback.message.answer(text=f"{lead_magnet}\n\nОтлично! Вот мои идеи - рекомендую сделать кнопку с возможность открыть твой материал в закрепленном посте (его я отправлю тебе следом) или же поставить кнопку на твой аккаунт, чтобы люди могли написать тебе напрямую 📱⚙", reply_markup=keyboards.to_fmenu_from_choices_kb)
+
+@router.callback_query(F.data == "continue_questions_magnet")
+async def continue_questions_magnet(callback: CallbackQuery):
+    await callback.answer()
+    user_id = callback.from_user.id
+    lead_magnet = HistoryFuncs.get_gpt_history(user_id)[2]
+    await callback.message.answer(text=f"{lead_magnet}\n\nОтлично! Вот мои идеи - рекомендую сделать кнопку с возможность открыть твой материал в закрепленном посте (его я отправлю тебе следом) или же поставить кнопку на твой аккаунт, чтобы люди могли написать тебе напрямую 📱⚙", reply_markup=keyboards.to_fmenu_from_choices_kb)
+
+
