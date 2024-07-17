@@ -342,7 +342,8 @@ async def third_question(message: Message, state: FSMContext):
 async def third_block(callback: CallbackQuery):
     chat_id = callback.message.chat.id
     user_id = callback.from_user.id
-    await callback.message.edit_text(text="Одну минутку...", reply_markup=None)
+    await callback.message.edit_reply_markup()
+    await callback.message.edit_text(text="Одну минутку...")
     business_info, company_info, audience_info = HistoryFuncs.get_history(user_id)
     marketing_strategy_plan_response, pinned_post_response, content_plan_response, lead_magnet_response = await create_answers(business_info, company_info, audience_info)
     HistoryFuncs.edit_history(user_id, business_info, company_info, audience_info, \
@@ -711,8 +712,8 @@ async def serious_tone(callback: CallbackQuery):
 async def advert_chara(callback: CallbackQuery):
     await callback.answer()
     await state.update_data({"chara": "Рекламный"})
-    await callback.message.edit_text(text="Так-с, все данные получены, дай мне секунду на подумать...",
-                                     reply_markup=None)
+    await callback.message.edit_reply_markup()
+    await callback.message.edit_text(text="Так-с, все данные получены, дай мне секунду на подумать...")
     data = await state.get_data()
     await state.clear()
     face, tone, chara = data["face"], data["tone"], date["chara"]
@@ -732,9 +733,9 @@ class InfoUser(StatesGroup):
 @router.callback_query(F.data == "post_by_user")
 async def post_by_user(callback: CallbackQuery, state: FSMContext):
     await callback.answer()
+    await callback.message.edit_reply_markup()
     await callback.message.answer(
-        text="Тогда напиши - о чем нужен пост, в каком стиле его написать, каким тоном говорить и в целом - буду рада, если сможешь мне излить душу в этом посте и выложить максимум вводных данных.",
-        reply_markup=None)
+        text="Тогда напиши - о чем нужен пост, в каком стиле его написать, каким тоном говорить и в целом - буду рада, если сможешь мне излить душу в этом посте и выложить максимум вводных данных.")
     await state.set_state(InfoUser.First)
 
 
