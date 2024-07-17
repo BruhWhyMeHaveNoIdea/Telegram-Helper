@@ -213,14 +213,6 @@ content_days_button = [
 
 content_days = InlineKeyboardMarkup(inline_keyboard=content_days_button)
 
-self_post_buttons = [
-    [
-        InlineKeyboardButton(text="Да, сделай все сама", callback_data="gpt_work"),
-        InlineKeyboardButton(text="Нет, я напишу сам")
-    ]
-]
-
-
 subscribtion_buy_buttons = [
     [
         InlineKeyboardButton(text='Подписка "Весь функционал" за 3.490₽', callback_data="common_buy")

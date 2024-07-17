@@ -1,14 +1,15 @@
 import datetime
 from aiogram import Router, F, Bot
-from aiogram.filters import Command
+from aiogram.filters import Command, CommandObject
 from aiogram.types import CallbackQuery, Message, LabeledPrice, PreCheckoutQuery
 from aiogram.fsm.state import StatesGroup, State
 from aiogram.fsm.context import FSMContext
 import logging
 from sqlalchemy.orm import sessionmaker
 from aiogram.utils.deep_linking import create_start_link, decode_payload
+import openai
 
-from bot.tools.gpt import ask_gpt, AdvancedGPT
+from bot.tools.gpt import ask_gpt
 from bot.tools.plugins.config import config
 from bot.tools.plugin_manager import PluginManager
 from bot.database.database import engine
@@ -25,9 +26,21 @@ router = Router()
 
 logging.basicConfig(level=logging.INFO)
 
+async def create_answers(business_info, company_info, audience_info):
+    marketing_strategy_plan_prompt = f"Ты маркетолог в телеграм, твои формулировки точны, просты, понятны любым клиентам :: Составь концепцию для маркетинга, который поможет грамотно вести телеграм канал со следующим описанием проекта - {business_info}. Учти также описание его аудитории - {audience_info}. И воспользуйся информацией о продуктах - {company_info}. :: Результат должен включать в себя развернутые 4 пункта :: 1 - описание каждого Продукта из списка предоставленной информацией о продуктах. Включать, что мы продаем, для кого мы это делаем и как мы это делаем. 2 - описание конкурентных преимуществ. Почему именно мы, чем мы лучше других, почему стоит выбрать именно нас. 3 - детальное описание целевой аудитории на базе предоствленных данных о целевой аудитории. Должно содержать - Кто наш клиент, чего он хочет, какие у него есть потребности и желания. 4 - Позиционирование. Кто мы, что мы делаем и для кого :: Выведи ответ без вводных фраз с подробным описанием на все пункты. Пиши на русском языке"
+    mark_answer = await ask_gpt(marketing_strategy_plan_prompt)
+    lead_magnet_prompt = f"Придумай 3 идеи лид-магнитов для телеграм канала и бизнеса в целом. Распиши подробно каждый лид-магнит в 10 тезисов. Учти описание проекта - {business_info}. Учти также описание его аудитории - {audience_info}. И воспользуйся информацией о продуктах - {company_info}. Также вопсользуйся следующей информацией про маркетинг проекта - {mark_answer}. Пиши на русском языке. Не давай каких-либо комментариев."
+    lead_answer = await ask_gpt(lead_magnet_prompt)
+    content_plan_prompt = content_plan_prompt = f'Создай контент план для телеграм канала на 7 дней, по 2 поста в день. Посты должны быть разные: продающие, вовлекающие, информационные, познавательные, опросы, отзывы, рассказ о продуктах эксперта. В посте указывать, какой это пост, как в примере ""Вечерний пост (Познавательный)"" :: Учти описание проекта - {business_info}. Учти также описание его аудитории - {audience_info}. И воспользуйся информацией о продуктах - {company_info}. Также воспользуйся следующей информацией про маркетинг проекта - {mark_answer}:: также учти наличие следующих лиц-магнитов - {lead_answer}. Пиши на русском языке'
+    content_plan = await ask_gpt(content_plan_prompt)
+    pinned_post_prompt = f"Учитывая информацию о проекте {business_info}, продуктах {company_info} и контент-план {content_plan}, напиши пост, который автор закрепит в телеграм. Пост должен вызвать интерес у людей, побудить записаться на консультацию, также укажи информацию о канале и авторе, о продуктах. Пост должен быть от 1500 до 2000 символов. Пиши на русском языке"
+    post_answer = await ask_gpt(pinned_post_prompt)
+    return mark_answer, post_answer, content_plan, lead_answer
+
+
 
 @router.message(Command("start"))
-async def start_handler(message: Message):
+async def start_handler(message: Message, command: CommandObject):
     current_time = datetime.datetime.now()
     user_id = message.from_user.id
     logging.info("Команда /start вызвана")
@@ -63,7 +76,7 @@ async def start_handler(message: Message):
         logging.info("Пользователь зарегистрирован")
     logging.error("before start")
     try:
-        args = message.get_args()
+        args = command.get_args()
         reference = decode_payload(args)
         await message.answer(text=texts.hello_message + f"\n Ваш реферал {reference}",
                              reply_markup=keyboards.to_main_menu_keyboard)
@@ -83,10 +96,17 @@ async def main_menu_secound_handler(callback: CallbackQuery):
     await callback.message.edit_reply_markup(reply_markup=keyboards.main_menu_secound_keyboard)
 
 
-@router.callback_query(F.data == "referal_system")
-async def referal(callback: CallbackQuery):
+@router.callback_query(F.data=="referal_and_donation")
+async def referal_and_donation(callback: CallbackQuery):
     await callback.answer()
-    referal_url = await create_start_link(str(callback.from_user.username), encode=True)
+    await callback.message.answer(text="referal_and_donation", reply_markup=keyboards.refer_donat_kb)
+
+
+
+@router.callback_query(F.data == "referal_system")
+async def referal(bot: Bot, callback: CallbackQuery):
+    await callback.answer()
+    referal_url = await create_start_link(bot=bot, payload=str(callback.from_user.username))
     await message.answer(text=f"Ваша реферальная ссылка: {referal_url}", reply_markup=keyboards.to_main_menu_keyboard)
 
 
@@ -264,7 +284,6 @@ class Questioning(StatesGroup):
 @router.callback_query(F.data == "your_marketer")
 async def your_marketer_handler(callback: CallbackQuery, state: FSMContext):
     if HistoryFuncs.user_in_database(callback.from_user.id):
-        print(1)
         await callback.message.delete()
         await callback.message.answer(text="Вы уже отвечали на вопросы, желаете пропустить их?",
                                       reply_markup=keyboards.marketer_question_keyboards)
@@ -294,7 +313,6 @@ async def secound_question(message: Message, state: FSMContext):
     await message.answer(text=texts.message3)
     await state.set_state(Questioning.Third_questiong)
 
-
 @router.message(Questioning.Third_questiong)
 async def third_question(message: Message, state: FSMContext):
     await state.update_data({"audio": message.text})
@@ -306,12 +324,10 @@ async def third_question(message: Message, state: FSMContext):
         about_business=business,
         about_company=company,
         about_audience=audience,
-        names_and_descriptions="",
         marketing_strategy_plan="",
         lead_magnet="",
         pinned_post="",
         content_plan="",
-        stories_content="",
     )
     if HistoryFuncs.user_in_database(user_id):
         HistoryFuncs.edit_history(id=user_id, new_business=business, new_company=company, new_audience=audience)
@@ -326,27 +342,13 @@ async def third_question(message: Message, state: FSMContext):
 async def third_block(callback: CallbackQuery):
     chat_id = callback.message.chat.id
     user_id = callback.from_user.id
+    await callback.message.edit_text(text="Одну минутку...", reply_markup=None)
     business_info, company_info, audience_info = HistoryFuncs.get_history(user_id)
-    names_and_descriptions_prompt = f"Придумай название и описание для телеграм канала проекта со следующим описанием проекта - {business_info}. Учти также описание его аудитории - {audience_info}. И воспользуйся информацией о продуктах - {company_info}. Описание должно быть не более 255 символов, а название должно содержать от 2 до 4 слов. Предложи 10 идей названий, каждое название пиши на новой строке. Не давай каких-либо комментариев. Пиши на русском языке"
-    marketing_strategy_plan_prompt = f"Ты маркетолог в телеграм, твои формулировки точны, просты, понятны любым клиентам :: Составь концепцию для маркетинга, который поможет грамотно вести телеграм канал со следующим описанием проекта - {business_info}. Учти также описание его аудитории - {audience_info}. И воспользуйся информацией о продуктах - {company_info}. :: Результат должен включать в себя развернутые 4 пункта :: 1 - описание каждого Продукта из списка предоставленной информацией о продуктах. Включать, что мы продаем, для кого мы это делаем и как мы это делаем. 2 - описание конкурентных преимуществ. Почему именно мы, чем мы лучше других, почему стоит выбрать именно нас. 3 - детальное описание целевой аудитории на базе предоствленных данных о целевой аудитории. Должно содержать - Кто наш клиент, чего он хочет, какие у него есть потребности и желания. 4 - Позиционирование. Кто мы, что мы делаем и для кого :: Выведи ответ без вводных фраз с подробным описанием на все пункты. Пиши на русском языке"
-    marketing_strategy_plan_response = await ask_gpt(marketing_strategy_plan_prompt)
-    # done лид магнит должен включать генерацию marketing_strategy_plan_prompt
-    lead_magnet_prompt = f"Придумай 5 идей лид-магнитов для телеграм канала и бизнеса в целом. Распиши подробно каждый лид-магнит в 15 тезисов. Учти описание проекта - {business_info}. Учти также описание его аудитории - {audience_info}. И воспользуйся информацией о продуктах - {company_info}. Также вопсользуйся следующей информацией про маркетинг проекта - {marketing_strategy_plan_response}. Пиши на русском языке. Не давай каких-либо комментариев."
-    lead_magnet_response = await ask_gpt(lead_magnet_prompt)
-    # done контент план должен содержать генерации marketing_strategy_plan_prompt и lead_magnet_prompt
-    content_plan_prompt = f'Создай контент план для телеграм канала на 7 дней, по 2 поста в день. Посты должны быть разные: продающие, вовлекающие, информационные, познавательные, опросы, отзывы, рассказ о продуктах эксперта. В посте указывать, какой это пост, как в примере ""Вечерний пост (Познавательный)"" :: Учти описание проекта - {business_info}. Учти также описание его аудитории - {audience_info}. И воспользуйся информацией о продуктах - {company_info}. Также воспользуйся следующей информацией про маркетинг проекта - {marketing_strategy_plan_response}:: также учти наличие следующих лиц-магнитов - {lead_magnet_response}. Пиши на русском языке. Не давай каких-либо комментариев.'
-    # done контент план для сторис должен содержать генерации marketing_strategy_plan_prompt и lead_magnet_prompt
-    stories_content_prompt = f"Создай контент план сторис для телеграм канала на 7 дней, который должен включать 21 сторис. Сторис должны быть разные: продающие, вовлекающие, информационные, познавательные, опросы, отзывы, рассказ о продуктах эксперта. :: Учти описание проекта - {business_info}. Учти также описание его аудитории - {audience_info}. И воспользуйся информацией о продуктах - {company_info}. Также воспользуйся следующей информацией про маркетинг проекта - {marketing_strategy_plan_response} :: также учти наличие следующих лиц-магнитов - {lead_magnet_response}. Пиши на русском языке. Не давай каких-либо комментариев."
-    # ради интереса, проверить сохраняет ли гпт контекст | в любом случае выполнять генерацию промпта последним
-    pinned_post_prompt = f"Учитывая информацию о проекте, продуктах и контент план, напиши пост, который автор закрепит в телеграм. Пост должен вызвать интерес у людей, побудить записаться на консультацию, также укажи информацию о канале и авторе, о продуктах. Пост должен быть от 1500 до 2000 символов. Пиши на русском языке"
-    names_and_descriptions_response = await ask_gpt(names_and_descriptions_prompt)
-    pinned_post_response = await ask_gpt(pinned_post_prompt)
-    content_plan_response = await ask_gpt(content_plan_prompt)
-    stories_content_response = await ask_gpt(stories_content_prompt)
-    HistoryFuncs.edit_history(user_id, business_info, company_info, audience_info, names_and_descriptions_response, \
+    marketing_strategy_plan_response, pinned_post_response, content_plan_response, lead_magnet_response = await create_answers(business_info, company_info, audience_info)
+    HistoryFuncs.edit_history(user_id, business_info, company_info, audience_info, \
                               marketing_strategy_plan_response, lead_magnet_response, pinned_post_response, \
-                              content_plan_response, stories_content_response)
-    await callback.message.edit_reply_markup(reply_markup=keyboards.to_function_menu)
+                              content_plan_response)
+    return await funcion_menu(callback)
 
 
 @router.callback_query(F.data == "next_keyboard1")
@@ -416,12 +418,10 @@ async def third_restarted_question(message: Message, state: FSMContext):
         about_business=business,
         about_company=company,
         about_audience=audience,
-        names_and_descriptions="",
         marketing_strategy_plan="",
         lead_magnet="",
         pinned_post="",
         content_plan="",
-        stories_content="",
     )
     if HistoryFuncs.user_in_database(user_id):
         HistoryFuncs.edit_history(id=user_id, new_business=business, new_company=company, new_audience=audience)
@@ -505,12 +505,10 @@ async def third_restarted_question(message: Message, state: FSMContext):
         about_business=business,
         about_company=company,
         about_audience=audience,
-        names_and_descriptions="",
         marketing_strategy_plan="",
         lead_magnet="",
         pinned_post="",
         content_plan="",
-        stories_content="",
     )
     if HistoryFuncs.user_in_database(user_id):
         HistoryFuncs.edit_history(id=user_id, new_business=business, new_company=company, new_audience=audience)
@@ -654,12 +652,10 @@ async def third_restarted_question(message: Message, state: FSMContext):
         about_business=business,
         about_company=company,
         about_audience=audience,
-        names_and_descriptions="",
         marketing_strategy_plan="",
         lead_magnet="",
         pinned_post="",
         content_plan="",
-        stories_content="",
     )
     if HistoryFuncs.user_in_database(user_id):
         HistoryFuncs.edit_history(id=user_id, new_business=business, new_company=company, new_audience=audience)
@@ -917,12 +913,10 @@ async def third_restarted_question(message: Message, state: FSMContext):
         about_business=business,
         about_company=company,
         about_audience=audience,
-        names_and_descriptions="",
         marketing_strategy_plan="",
         lead_magnet="",
         pinned_post="",
         content_plan="",
-        stories_content="",
     )
     if HistoryFuncs.user_in_database(user_id):
         HistoryFuncs.edit_history(id=user_id, new_business=business, new_company=company, new_audience=audience)
