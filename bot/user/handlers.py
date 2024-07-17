@@ -808,8 +808,9 @@ async def forward_video(callback: CallbackQuery, state: FSMContext):
                                      reply_markup=keyboards.to_fmenu_from_choices_kb)
 
 @router.callback_query(F.data == "sales_assistance")
-async def sales_assistance(callback: CallbackQuery):
+async def sales_assistance(callback: CallbackQuery, state: FSMContext):
     await callback.answer()
+    await state.clear()
     await callback.message.answer(text="Сообщение 10", reply_markup=keyboard.sales_assistance)
 
 class GPT_dialogue(StatesGroup):
