@@ -804,8 +804,9 @@ async def forward_video(callback: CallbackQuery, state: FSMContext):
                                      reply_markup=keyboards.to_fmenu_from_choices_kb)
 
 @router.callback_query(F.data == "sales_assistance")
-async def sales_assistance(callback: CallbackQuery):
+async def sales_assistance(callback: CallbackQuery, state: FSMContext):
     await callback.answer()
+    await state.clear()
     await callback.message.answer(text="Сообщение 10", reply_markup=keyboard.sales_assistance)
 
 class GPT_dialogue(StatesGroup):
@@ -813,15 +814,14 @@ class GPT_dialogue(StatesGroup):
 
 
 @router.callback_query(F.data == "clear_data")
-async def clear_data(callback: CallbackQuery, message: Message):
+async def clear_data(callback: CallbackQuery):
     await callback.answer()
     user_id = callback.from_user.id
     if user_id in user_histories:
         del user_histories[user_id]
-        await message.answer(text="Контекст очищен!")
+        await callback.message.answer(text="Контекст очищен!", reply_markup=keyboards.to_sales_menu)
     else:
-        await message.answer(text="История пуста!")
-    return await sales_assistance(callback)
+        await callback.message.answer(text="История пуста!", reply_markup=keyboards.to_sales_menu)
 
 @router.callback_query(F.data == "start_helper")
 async def start_helper(callback: CallbackQuery, state: FSMContext):
@@ -846,12 +846,11 @@ SYSTEM_MESSAGE = {
 }
 
 @router.message(GPT_dialogue.First)
-async def dialogue_with_GPT(callback: CallbackQuery, message: Message):
+async def dialogue_with_GPT(message: Message):
     user_id = message.from_user.id
     msg = message.text
     if msg.lower() == "закончить":
-        await message.answer(text="Прекращаем диалог")
-        return sales_assistance(callback)
+        await message.answer(text="Прекращаем диалог", reply_markup=keyboards.to_sales_menu)
     if user_id not in user_histories:
         user_histories[user_id] = [SYSTEM_MESSAGE]
 

@@ -283,3 +283,6 @@ sales_assistance_b = [[InlineKeyboardButton(text="Запустить помощ�
                       [InlineKeyboardButton(text="Назад", callback_data="business_assistant")]]
 
 sales_assistance= InlineKeyboardMarkup(inline_keyboard=sales_assistance_b)
+
+to_sales_buttons = [[InlineKeyboardButton(text="Назад", callback_data="sales_assistance")]]
+to_sales_menu = InlineKeyboardMarkup(inline_keyboard=to_sales_button)
